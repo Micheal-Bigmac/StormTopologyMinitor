@@ -1,0 +1,121 @@
+# topology definition
+# name to be used when submitting
+name: "topic-online-topology-20161116-gps"
+
+# topology configuration
+# this will be passed to the submitter as a map of config options
+#
+config:
+  nimbus.host: "${nimbus.host}"
+  storm.zookeeper.servers: ["${storm.zookeeper.servers}"]
+  topology.workers: 3
+  hbase.conf:
+    hbase.zookeeper.quorum: "${hbase.zookeeper.quorum}"
+  geography.description:
+    map.decoder.url: "${map.decoder.url}"
+    map.decoder.uid: "${map.decoder.uid}"
+# Components
+components:
+  - id: "TableName"
+    className: "java.lang.String"
+    constructorArgs:
+      - "${hbase.table.name.history}"
+  - id: "TableNameHistoryTest"
+    className: "java.lang.String"
+    constructorArgs:
+      - "${hbase.table.name.history.test}"
+  - id: "TableNameMiddle"
+    className: "java.lang.String"
+    constructorArgs:
+      - "${hbase.table.name.middle.test}"    
+    
+ # - id: "stringScheme"
+ #   className: "org.apache.storm.kafka.StringScheme"
+  - id: "stringScheme"
+    className: "com.hsae.storm.util.MessageScheme"
+ 
+  - id: "stringMultiScheme"
+    className: "org.apache.storm.spout.SchemeAsMultiScheme"
+    constructorArgs:
+      - ref: "stringScheme"
+  - id: "zkHosts"
+    className: "org.apache.storm.kafka.ZkHosts"
+    constructorArgs:
+      - "admin.cvnavi-test.com:2181,name1.cvnavi-test.com:2181,name2.cvnavi-test.com:2181/kafka"
+      
+  - id: "spoutConfig"
+    className: "org.apache.storm.kafka.SpoutConfig"
+    constructorArgs:
+      # brokerHosts
+      - ref: "zkHosts"
+      # topic
+      - "topic-online"
+      # zkRoot
+      - "/topic-online-20161015"
+      # id
+      - "myId"
+    properties:
+      - name: "ignoreZkOffsets"
+        value: false
+      - name: "scheme"
+        ref: "stringMultiScheme"
+
+spouts:
+  - id: "kafka-spout"
+    className: "org.apache.storm.kafka.KafkaSpout"
+    constructorArgs:
+      - ref: "spoutConfig"
+    parallelism: 6
+
+# bolt definitions
+bolts:
+
+  - id: "bolt-recData"
+    className: "com.hsae.storm.bolt.IntervalMessageBolt"
+    parallelism: 3
+  
+  # hbase
+    
+  #db2  
+  - id: "bolt-db2-Gps"
+    className: "com.hsae.storm.bolt.db2.GpsDB2Bolt_2"
+    parallelism: 5
+
+  - id: "bolt-db2-error"
+    className: "com.hsae.storm.bolt.Db2ErrorDeal"
+    parallelism: 1
+ 
+
+#stream definitions
+# stream definitions define connections between spouts and bolts.
+# note that such connections can be cyclical
+streams:
+  
+  - name: "kafka-spout --> bolt-recData" 
+    from: "kafka-spout"
+    to: "bolt-recData"
+    grouping:
+      type: SHUFFLE
+  
+  #极光推送流走向
+  #- name: "bolt-recData --> bolt-alarmPush"
+   # from: "bolt-recData"
+    #to: "bolt-alarmPush"
+    #grouping:
+     # type: SHUFFLE
+      #streamId: "100001"
+    
+  # db2
+  - name: "bolt-recData --> bolt-db2-Gps"
+    from: "bolt-recData"
+    to: "bolt-db2-Gps"
+    grouping:
+      type: SHUFFLE
+      streamId: "100001"
+      
+  - name: "bolt-db2-Gps --> bolt-db2-error"
+    from: "bolt-db2-Gps"
+    to: "bolt-db2-error"
+    grouping:
+      type: SHUFFLE
+      streamId: "404"

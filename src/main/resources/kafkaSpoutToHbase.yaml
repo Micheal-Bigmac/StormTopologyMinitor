@@ -1,0 +1,339 @@
+# topology definition
+# name to be used when submitting
+name: "topic-test-topology-20161125-hbase"
+
+# topology configuration
+# this will be passed to the submitter as a map of config options
+#
+config:
+  nimbus.host: "${nimbus.host}"
+  storm.zookeeper.servers: ["${storm.zookeeper.servers}"]
+  topology.workers: 3
+  hbase.conf:
+    hbase.zookeeper.quorum: "${hbase.zookeeper.quorum}"
+  geography.description:
+    map.decoder.url: "${map.decoder.url}"
+    map.decoder.uid: "${map.decoder.uid}"
+# Components
+components:
+  - id: "TableName"
+    className: "java.lang.String"
+    constructorArgs:
+      - "${hbase.table.name.history}"
+  - id: "TableNameHistoryTest"
+    className: "java.lang.String"
+    constructorArgs:
+      - "${hbase.table.name.history.test}"
+  - id: "TableNameMiddle"
+    className: "java.lang.String"
+    constructorArgs:
+      - "${hbase.table.name.middle.test}"
+  - id: "GpsMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.GpsMapper"
+  - id: "CtripAggrMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.CtripAggrMapper"
+  - id: "GpsAppendMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.GpsAppendMapper"
+  - id: "CanMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.CanMapper"
+  - id: "AlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.AlarmMapper"
+  - id: "AlarmAggrMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.AlarmAggrMapper"
+  - id: "AreaInOutAlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.AreaInOutAlarmMapper"
+  - id: "OverSpeedAlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.OverSpeedAlarmMapper"
+  - id: "OverTimeAlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.OverTimeAlarmMapper"
+  - id: "MediaMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.MediaMapper"
+  - id: "MediaEventMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.MediaEventMapper"
+  - id: "OilMassMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.OilMassMapper"
+  - id: "YouWeiTempMapper"
+    className: "com.hsae.storm.bolt.hbase.mapper.YouWeiTempMapper"
+    
+    
+ # - id: "stringScheme"
+ #   className: "org.apache.storm.kafka.StringScheme"
+  - id: "stringScheme"
+    className: "com.hsae.storm.util.MessageScheme"
+ 
+  - id: "stringMultiScheme"
+    className: "org.apache.storm.spout.SchemeAsMultiScheme"
+    constructorArgs:
+      - ref: "stringScheme"
+  - id: "zkHosts"
+    className: "org.apache.storm.kafka.ZkHosts"
+    constructorArgs:
+      - "admin.cvnavi-test.com:2181,name1.cvnavi-test.com:2181,name2.cvnavi-test.com:2181/kafka"
+      
+  - id: "spoutConfig"
+    className: "org.apache.storm.kafka.SpoutConfig"
+    constructorArgs:
+      # brokerHosts
+      - ref: "zkHosts"
+      # topic
+      - "topic-test"
+      #- "topic-online"
+      # zkRoot
+      - "/topic-test-20161125"
+      #- "/topic-online-20161114"
+      # id
+      - "myId"
+    properties:
+      - name: "ignoreZkOffsets"
+        value: false
+      - name: "scheme"
+        ref: "stringMultiScheme"
+
+spouts:
+  - id: "kafka-spout"
+    className: "org.apache.storm.kafka.KafkaSpout"
+    constructorArgs:
+      - ref: "spoutConfig"
+    parallelism: 6
+
+# bolt definitions
+bolts:
+  # hbase
+  
+  - id: "bolt-recData"
+    className: "com.hsae.storm.bolt.IntervalMessageBolt"
+    parallelism: 3
+  
+  - id: "bolt-GeographyDescription"
+    className: "com.hsae.storm.bolt.GeographyDescriptionBolt"
+    parallelism: 1
+
+  - id: "bolt-hbase-GpsMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "GpsMapper"
+    parallelism: 1
+    
+  #- id: "bolt-CtripAggrBolt"
+  #  className: "com.hsae.storm.bolt.CtripAggrBolt"
+  #  parallelism: 1 
+    
+  - id: "bolt-AlarmAggrBolt"
+    className: "com.hsae.storm.bolt.AlarmAggrBolt"
+    parallelism: 1 
+    
+  - id: "bolt-hbase-CtripAggrMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableNameMiddle" # HBase table name
+      - ref: "CtripAggrMapper"
+    parallelism: 1 
+    
+  - id: "bolt-hbase-GpsAppendMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "GpsAppendMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-CanMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "CanMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-AlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "AlarmMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-AlarmAggrMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "AlarmAggrMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-AlarmAggrMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "AlarmAggrMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-AreaInOutAlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "AreaInOutAlarmMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-OverSpeedAlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "OverSpeedAlarmMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-OverTimeAlarmMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "OverTimeAlarmMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-MediaMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "MediaMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-MediaEventMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "MediaEventMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-OilMassMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "OilMassMapper"
+    parallelism: 1
+    
+  - id: "bolt-hbase-YouWeiTempMapper"
+    className: "com.hsae.storm.bolt.hbase.CommonPutHBaseBolt"
+    constructorArgs:
+      - ref: "TableName" # HBase table name
+      - ref: "YouWeiTempMapper"
+    parallelism: 1
+    
+
+#stream definitions
+# stream definitions define connections between spouts and bolts.
+# note that such connections can be cyclical
+streams:
+  # hbase
+  
+  - name: "kafka-spout --> bolt-recData" 
+    from: "kafka-spout"
+    to: "bolt-recData"
+    grouping:
+      type: SHUFFLE
+  - name: "bolt-recData --> bolt-GeographyDescription" # name isn't used (placeholder for logging, UI, etc.)
+    from: "bolt-recData"
+    to: "bolt-GeographyDescription"
+    grouping:
+      type: SHUFFLE
+      streamId: "100001"
+      
+  - name: "bolt-recData --> bolt-hbase-CanMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-CanMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100003"  
+
+  - name: "bolt-GeographyDescription --> bolt-hbase-GpsMapper"
+    from: "bolt-GeographyDescription"
+    to:   "bolt-hbase-GpsMapper"
+    grouping:
+      type: FIELDS
+      args: ["vehicleid"]
+      
+  #- name: "bolt-GeographyDescription --> bolt-CtripAggrBolt"
+  #  from: "bolt-GeographyDescription"
+  #  to:   "bolt-CtripAggrBolt" 
+  #  grouping:
+  #    type: FIELDS
+  #    args: ["vehicleid"]
+      
+  - name: "bolt-GeographyDescription --> bolt-AlarmAggrBolt"
+    from: "bolt-GeographyDescription"
+    to:   "bolt-AlarmAggrBolt" 
+    grouping:
+      type: FIELDS
+      args: ["vehicleid"]
+
+  # - name: "bolt-CtripAggrBolt --> bolt-hbase-CtripAggrMapper"
+  #  from: "bolt-CtripAggrBolt"
+  #  to:   "bolt-hbase-CtripAggrMapper" 
+  #  grouping:
+  #    type: SHUFFLE
+      
+  - name: "bolt-AlarmAggrBolt --> bolt-hbase-AlarmAggrMapper"
+    from: "bolt-AlarmAggrBolt"
+    to:   "bolt-hbase-AlarmAggrMapper" 
+    grouping:
+      type: SHUFFLE
+      streamId: "AlarmAggr"
+      
+  - name: "bolt-AlarmAggrBolt --> bolt-hbase-AreaInOutAlarmMapper"
+    from: "bolt-AlarmAggrBolt"
+    to:   "bolt-hbase-AreaInOutAlarmMapper" 
+    grouping:
+      type: SHUFFLE
+      streamId: "AreaInOut"
+      
+  - name: "bolt-AlarmAggrBolt --> bolt-hbase-OverSpeedAlarmMapper"
+    from: "bolt-AlarmAggrBolt"
+    to:   "bolt-hbase-OverSpeedAlarmMapper" 
+    grouping:
+      type: SHUFFLE
+      streamId: "OverSpeed"
+      
+  - name: "bolt-AlarmAggrBolt --> bolt-hbase-OverTimeAlarmMapper"
+    from: "bolt-AlarmAggrBolt"
+    to:   "bolt-hbase-OverTimeAlarmMapper" 
+    grouping:
+      type: SHUFFLE
+      streamId: "OverTime"
+      
+  - name: "bolt-recData --> bolt-hbase-GpsAppendMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-GpsAppendMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100002"
+
+  - name: "bolt-recData --> bolt-hbase-AlarmMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-AlarmMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100004"
+      
+  - name: "bolt-recData --> bolt-hbase-OilMassMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-OilMassMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100009"
+      
+  - name: "bolt-recData --> bolt-hbase-MediaMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-MediaMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100043"
+      
+  - name: "bolt-recData --> bolt-hbase-MediaEventMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-MediaEventMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100044"
+      
+  - name: "bolt-recData --> bolt-hbase-YouWeiTempMapper"
+    from: "bolt-recData"
+    to: "bolt-hbase-YouWeiTempMapper"
+    grouping:
+      type: SHUFFLE
+      streamId: "100014"
+      

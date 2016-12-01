@@ -1,0 +1,173 @@
+# topology definition
+# name to be used when submitting
+name: "backupZmq-kafka-3536-topology-20161008"
+
+# topology configuration
+# this will be passed to the submitter as a map of config options
+#
+config:
+  nimbus.host: "${nimbus.host}"
+  storm.zookeeper.servers: ["${storm.zookeeper.servers}"]
+  topology.workers: 2
+  hbase.conf:
+    hbase.zookeeper.quorum: "${hbase.zookeeper.quorum}"
+  geography.description:
+    map.decoder.url: "${map.decoder.url}"
+    map.decoder.uid: "${map.decoder.uid}"
+  kafka.conf:
+    zookeeper.connect: "${hbase.zookeeper.quorum}"
+    metadata.broker.list: "${metadata.broker.list}"
+    hdfs.url: "${hdfs.url}" 
+  alarmType.conf:
+    A0: 紧急报警
+    A1: 超速报警
+    A2: 疲劳驾驶
+    A3: 预警
+    A4: GNSS模块发生故障
+    A5: GNSS天线未接或被剪断
+    A6: GNSS天线短路
+    A7: 终端主电源欠压
+    A8: 终端主电源掉电
+    A9: 终端LCD或显示器故障
+    A10: TTS模块故障
+    A11: 摄像头故障
+    A12: 道路运输证IC 卡模块故障
+    A13: 超速预警
+    A14: 疲劳驾驶预警
+    A18: 当天累计驾驶超时
+    A19: 超时停车
+    A20: 进区域
+    A21: 进路线
+    A22: 路段行驶时间不足
+    A23: 路线偏离报警
+    A24: 车辆VSS故障
+    A25: 车辆油量异常
+    A26: 车辆被盗（通过车辆防盗器）
+    A27: 车辆非法点火
+    A28: 车辆非法移位
+    A29: 碰撞侧翻报警
+    A30: 侧翻预警
+    A31: 非法开门报警
+    A32: 严重故障
+    A33: 制动气压报警
+    A34: 油压报警
+    A35: 水位低报警
+    A36: 制动蹄片磨损报警
+    A37: 空滤堵塞报警
+    A38: 缓速器高温报警信号
+    A39: 仓温报警信号
+    A40: 机滤堵塞信号
+    A41: 燃油堵塞信号
+    A42: 机油温度报警信号
+    A43: 燃油警告
+    A44: 空档滑行告警
+    A45: 超长怠速告警
+    A46: 怠速空调告警
+    A47: 发动机超转告警
+    A48: 急加速报警
+    A49: 急减速报警
+    A50: 门开报警
+    A51: 冷却液温度过高报警
+    A52: 蓄电池电压报警
+    A53: ABS故障告警
+    A54: CAN总线通讯故障告警
+    A55: 车辆转弯报警
+    A56: 安全带未系报警
+    A62: 发动机舱烟雾报警
+    A63: 电池仓烟雾报警
+    A64: 平台-偏离路线报警
+    A65: 平台-线路关键点报警
+    A66: 平台-区域报警
+    A67: 平台-分路段限速报警
+    A68: 平台-疲劳驾驶报警
+    A69: 平台围栏区域超速报警
+    A71: 出区域
+    A72: 出线路
+    A73: 路段行驶时间过长
+    A74: 平台-场外停车预警
+    A75: 平台-非指定道口出入境预警
+    A76: 平台-路段行驶时间不足
+    A77: 平台-路段行驶时间过长
+    A78: 顶盖未合严或传感器被破坏报警
+    A79: 超高或传感器被破坏报警
+    A80: ECU被修改报警
+    A81: 碰撞报警
+components:
+  - id: "syncPolicy1"
+    className: "org.apache.storm.hdfs.bolt.sync.CountSyncPolicy"
+    constructorArgs:
+      - 5000
+  - id: "rotationPolicy1"
+    className: "org.apache.storm.hdfs.bolt.rotation.FileSizeRotationPolicy"
+    constructorArgs:
+      - 128
+      - MB
+
+  - id: "fileNameFormat1"
+    className: "org.apache.storm.hdfs.bolt.format.DefaultFileNameFormat"
+    configMethods:
+      - name: "withPath"
+        args: ["${hdfs.write.backmessage.dir}"]
+      - name: "withExtension"
+        args: [".txt"]
+
+  - id: "recordFormat1"
+    className: "org.apache.storm.hdfs.bolt.format.DelimitedRecordFormat"
+    configMethods:
+      - name: "withFieldDelimiter"
+        args: ["|"]
+
+  - id: "rotationAction1"
+    className: "org.apache.storm.hdfs.common.rotation.MoveFileAction"
+    configMethods:
+      - name: "toDestination"
+        args: ["${hdfs.dest.backupZMQMes.dir}"]        
+  
+
+# spout definitions
+spouts:
+  - id: "spout-recData"
+    className: "com.hsae.storm.spout.KafkaProducerSpout"
+    configMethods:
+      - name: "setZmpSenderAddrs"
+        args: ["${zmq.uri}"]
+    parallelism: 3
+    
+bolts:
+  - id: "bolt-backupZMQ"
+    className: "org.apache.storm.hdfs.bolt.HdfsBolt"
+    configMethods:
+      - name: "withConfigKey"
+        args: ["hdfs.config"]
+      - name: "withFsUrl"
+        args: ["${hdfs.url}"]
+      - name: "withFileNameFormat"
+        args: [ref: "fileNameFormat1"]
+      - name: "withRecordFormat"
+        args: [ref: "recordFormat1"]
+      - name: "withRotationPolicy"
+        args: [ref: "rotationPolicy1"]
+      - name: "withSyncPolicy"
+        args: [ref: "syncPolicy1"]
+      - name: "addRotationAction"
+        args: [ref: "rotationAction1"]
+    parallelism: 1
+
+  - id: "bolt-DealStreamId"
+    className: "com.hsae.storm.bolt.DealStreamIDBolt"
+    parallelism: 1
+streams:
+  - name: "spout-recData --> bolt-DealStreamId" 
+    from: "spout-recData"
+    to: "bolt-DealStreamId"
+    grouping:
+      type: SHUFFLE
+      streamId: "222222" 
+             
+  - name: "spout-recData --> bolt-backupZMQ" 
+    from: "spout-recData"
+    to: "bolt-backupZMQ"
+    grouping:
+      type: SHUFFLE
+      streamId: "111111"
+

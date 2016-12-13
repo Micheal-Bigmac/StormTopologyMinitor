@@ -68,7 +68,7 @@ public class SendMail {
 		this.from = "15518977794@163.com";
 		this.smtpServer = "smtp.163.com";
 		this.userName = "15518977794@163.com";
-		this.password = "song5438";
+		this.password = "xxxxx";
 		this.subject="Storm Topology Monitor Alert";
 	}
 
